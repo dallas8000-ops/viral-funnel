@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Members</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <main class="join">
+    <h1>You're in.</h1>
+    <p class="muted" id="msg">Confirming subscription…</p>
+    <p id="discord"></p>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    document.getElementById("msg").textContent =
+      params.get("session_id")
+        ? "Payment received. Check the email on the Stripe receipt. If Discord is configured, the invite appears after webhook delivery."
+        : "Open this page after checkout.";
+  </script>
+</body>
+</html>

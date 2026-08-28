@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Factory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <p class="brand">FUNNEL ENGINE</p>
+      <nav>
+        <button data-tab="board" class="nav on">Scoreboard</button>
+        <button data-tab="config" class="nav">Offer lock</button>
+        <button data-tab="sources" class="nav">Scout</button>
+        <button data-tab="queue" class="nav">Queue</button>
+      </nav>
+      <div class="side-actions">
+        <button id="runFactory" class="btn-primary">Run factory</button>
+        <button id="runPublish" class="btn-ghost">Sweep publish</button>
+        <p class="hint">Factory: parallel scout → batched rewrite → process-pool render → 7-day slot fill. Publish: Meta if tokens exist, else export packs.</p>
+      </div>
+    </aside>
+    <main>
+      <header class="top">
+        <div>
+          <h1 id="verdictTitle">—</h1>
+          <p id="verdictLine" class="muted"></p>
+        </div>
+        <div id="kpiRow" class="kpis"></div>
+      </header>
+
+      <section id="board" class="panel on">
+        <div class="grid-2">
+          <article class="card">
+            <h2>P&L clock</h2>
+            <pre id="math" class="mono"></pre>
+          </article>
+          <article class="card">
+            <h2>Last factory timings</h2>
+            <pre id="timings" class="mono">Run the factory.</pre>
+          </article>
+        </div>
+      </section>
+
+      <section id="config" class="panel">
+        <form id="cfg" class="card stack">
+          <h2>One niche. One enemy. One $49 offer.</h2>
+          <label>Niche<input name="niche" required placeholder="B2B operators who sell expertise" /></label>
+          <label>Voice<input name="voice" placeholder="Direct, no guru tone, short sentences" /></label>
+          <label>Enemy<input name="enemy" placeholder="Content theater / fake hustle" /></label>
+          <label>Promise<input name="promise" placeholder="A room that actually gets you clients" /></label>
+          <label>Community name<input name="offer_name" placeholder="The Floor" /></label>
+          <label>What's inside<textarea name="offer_bullets" rows="3" placeholder="Weekly teardown&#10;Deal review&#10;Templates"></textarea></label>
+          <label>Reddit subs (comma)<input name="subs" value="Entrepreneur,smallbusiness,marketing,sales" /></label>
+          <div class="row">
+            <button type="submit" class="btn-primary">Save lock</button>
+            <button type="button" id="startClock" class="btn-ghost">Start 30-day clock</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="sources" class="panel">
+        <article class="card">
+          <h2>Ranked inventory</h2>
+          <table>
+            <thead><tr><th>Score</th><th>Src</th><th>Title</th></tr></thead>
+            <tbody id="sourceBody"></tbody>
+          </table>
+        </article>
+      </section>
+
+      <section id="queue" class="panel">
+        <article class="card">
+          <h2>3x/day slots</h2>
+          <table>
+            <thead><tr><th>When</th><th>Status</th><th>Hook</th><th>Pack</th></tr></thead>
+            <tbody id="queueBody"></tbody>
+          </table>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script src="/static/operator.js"></script>
+</body>
+</html>

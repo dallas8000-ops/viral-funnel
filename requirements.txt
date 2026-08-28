@@ -1,0 +1,17 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy[asyncio]==2.0.36
+aiosqlite==0.20.0
+httpx[http2]==0.28.1
+orjson==3.10.12
+pillow==11.0.0
+pydantic==2.10.3
+pydantic-settings==2.6.1
+apscheduler==3.10.4
+stripe==11.4.1
+python-multipart==0.0.19
+openai==1.57.4
+python-dotenv==1.0.1
+tenacity==9.0.0
+tzdata==2024.2
+h2==4.1.0

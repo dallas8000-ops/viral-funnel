@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Join</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <main class="join">
+    <p class="brand">$49 / MONTH · CANCEL ANYTIME</p>
+    <h1 id="headline">Stop collecting tactics. Get in the room that ships.</h1>
+    <p class="muted" id="sub">One offer. Weekly teardowns. Live deal review. No course cemetery.</p>
+    <p class="price">$49 per month. Access starts when payment clears. No free trial — the 30-day clock does not survive free riders.</p>
+    <button id="pay" class="btn-primary">Join the community</button>
+    <p class="muted" id="err"></p>
+  </main>
+  <script>
+    fetch("/api/scoreboard").then(r => r.json()).then(s => {
+      if (s.offer_name) document.getElementById("headline").textContent = s.offer_name;
+    });
+    document.getElementById("pay").onclick = async () => {
+      const err = document.getElementById("err");
+      err.textContent = "";
+      try {
+        const r = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Checkout failed");
+        location.href = d.url;
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    };
+  </script>
+</body>
+</html>
