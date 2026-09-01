@@ -76,7 +76,7 @@ def next_slots(now: datetime, hours: list[int], tz: ZoneInfo, days: int) -> list
     return slots
 
 
-async def fill_queue(session: AsyncSession, jobs: list[FactoryJob]) -> int:
+async def fill_queue(session: AsyncSession, jobs: list[FactoryJob] | None = None) -> int:
     settings = get_settings()
     tz = ZoneInfo(settings.timezone)
     hours = settings.post_hour_list
@@ -85,14 +85,26 @@ async def fill_queue(session: AsyncSession, jobs: list[FactoryJob]) -> int:
             select(ScheduledPost).where(ScheduledPost.status.in_(("pending", "publishing")))
         )
     ).all()
-    taken = {p.publish_at.astimezone(timezone.utc).isoformat() for p in existing}
+    taken_slots = {p.publish_at.astimezone(timezone.utc).isoformat() for p in existing}
+    taken_jobs = set((await session.scalars(select(ScheduledPost.job_id))).all())
     slots = [
         s
         for s in next_slots(datetime.now(timezone.utc), hours, tz, settings.inventory_days)
-        if s.isoformat() not in taken
+        if s.isoformat() not in taken_slots
     ]
+    db_ready = list(
+        (
+            await session.scalars(
+                select(FactoryJob).where(FactoryJob.status == "ready").order_by(FactoryJob.id)
+            )
+        ).all()
+    )
+    by_id = {j.id: j for j in db_ready if j.id}
+    for job in jobs or []:
+        if job.id and job.status == "ready":
+            by_id[job.id] = job
+    ready = [j for j in by_id.values() if j.id not in taken_jobs]
     n = 0
-    ready = [j for j in jobs if j.status == "ready"]
     for job, slot in zip(ready, slots, strict=False):
         session.add(
             ScheduledPost(job_id=job.id, kind="carousel", publish_at=slot, status="pending")
@@ -144,7 +156,8 @@ async def run_factory(session: AsyncSession) -> dict:
     loop = asyncio.get_running_loop()
 
     async def render_job(item: SourceItem, pack: dict) -> FactoryJob:
-        dest = str(ASSET_DIR / f"job_{item.id}")
+        folder = f"job_{item.id}"
+        dest = str(ASSET_DIR / folder)
         await loop.run_in_executor(
             executor, render_pack, dest, pack["slides"], pack["reel_script"], offer
         )
@@ -155,7 +168,7 @@ async def run_factory(session: AsyncSession) -> dict:
             caption=pack["caption"],
             reel_script=pack["reel_script"],
             slides=pack["slides"],
-            asset_dir=dest,
+            asset_dir=folder,
         )
         session.add(job)
         return job

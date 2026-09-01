@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -25,11 +27,13 @@ async def _publish_job() -> None:
 def start_scheduler() -> None:
     if scheduler.running:
         return
-    hours = get_settings().post_hour_list
+    settings = get_settings()
+    hours = settings.post_hour_list
     hour_expr = ",".join(str(h) for h in hours)
+    tz = ZoneInfo(settings.timezone)
     scheduler.add_job(
         _factory_job,
-        CronTrigger(hour=3, minute=10),
+        CronTrigger(hour=3, minute=10, timezone=tz),
         id="daily_factory",
         replace_existing=True,
         max_instances=1,
@@ -37,7 +41,7 @@ def start_scheduler() -> None:
     )
     scheduler.add_job(
         _publish_job,
-        CronTrigger(hour=hour_expr, minute=0),
+        CronTrigger(hour=hour_expr, minute=0, timezone=tz),
         id="slot_publish",
         replace_existing=True,
         max_instances=1,

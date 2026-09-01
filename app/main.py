@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -10,9 +11,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.db import init_db, session_scope
-from app.engine.billing import checkout_url, handle_webhook
+from app.engine.billing import checkout_url, handle_webhook, member_from_checkout_session
 from app.engine.pipeline import load_config, run_factory
-from app.engine.publisher import publish_due
+from app.engine.publisher import pack_public, publish_due
 from app.engine.render import shutdown_pool
 from app.engine.scheduler import start_scheduler
 from app.engine.scoreboard import scoreboard
@@ -26,7 +27,8 @@ STATIC = Path(__file__).resolve().parent / "static"
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
-    start_scheduler()
+    if "pytest" not in sys.modules:
+        start_scheduler()
     yield
     await close_http()
     shutdown_pool()
@@ -131,6 +133,19 @@ async def api_publish() -> dict:
         return await publish_due(session)
 
 
+@app.get("/api/offer")
+async def api_offer() -> dict:
+    settings = get_settings()
+    async with session_scope() as session:
+        row = await load_config(session)
+        return {
+            "offer_name": row.offer_name or "Operator community",
+            "promise": row.promise,
+            "offer_bullets": row.offer_bullets,
+            "price_cents": settings.stripe_price_cents,
+        }
+
+
 @app.get("/api/queue")
 async def api_queue() -> dict:
     async with session_scope() as session:
@@ -156,6 +171,7 @@ async def api_queue() -> dict:
                     "hook": (jobs.get(p.job_id).hook if jobs.get(p.job_id) else ""),
                     "asset_dir": (jobs.get(p.job_id).asset_dir if jobs.get(p.job_id) else ""),
                     "caption": (jobs.get(p.job_id).caption if jobs.get(p.job_id) else ""),
+                    "pack_url": (pack_public(jobs[p.job_id])["pack_url"] if jobs.get(p.job_id) else ""),
                 }
                 for p in posts
             ]
@@ -188,6 +204,7 @@ async def api_job(job_id: int) -> dict:
         job = await session.get(FactoryJob, job_id)
         if not job:
             raise HTTPException(404, "job not found")
+        pack = pack_public(job)
         return {
             "id": job.id,
             "hook": job.hook,
@@ -196,6 +213,7 @@ async def api_job(job_id: int) -> dict:
             "slides": job.slides,
             "asset_dir": job.asset_dir,
             "status": job.status,
+            **pack,
         }
 
 
@@ -205,7 +223,8 @@ class CheckoutIn(BaseModel):
 
 @app.post("/api/checkout")
 async def api_checkout(body: CheckoutIn | None = None) -> dict:
-    url = await checkout_url(body.email if body else None)
+    async with session_scope() as session:
+        url = await checkout_url(session, body.email if body else None)
     return {"url": url}
 
 
@@ -216,13 +235,22 @@ async def stripe_webhook(request: Request) -> dict:
 
 
 @app.get("/api/community")
-async def api_community(token: str = "") -> dict:
+async def api_community(token: str = "", session_id: str = "") -> dict:
     settings = get_settings()
     async with session_scope() as session:
-        row = await session.scalar(select(Member).where(Member.access_token == token)) if token else None
+        row = None
+        if session_id:
+            row = await member_from_checkout_session(session, session_id)
+        elif token:
+            row = await session.scalar(select(Member).where(Member.access_token == token))
         if row is None or row.status != "active":
             return {"ok": False}
-        return {"ok": True, "email": row.email, "discord": settings.discord_invite_url}
+        return {
+            "ok": True,
+            "email": row.email,
+            "discord": settings.discord_invite_url,
+            "token": row.access_token,
+        }
 
 
 @app.get("/favicon.ico")

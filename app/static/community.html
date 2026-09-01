@@ -15,10 +15,31 @@
   </main>
   <script>
     const params = new URLSearchParams(location.search);
-    document.getElementById("msg").textContent =
-      params.get("session_id")
-        ? "Payment received. Check the email on the Stripe receipt. If Discord is configured, the invite appears after webhook delivery."
-        : "Open this page after checkout.";
+    const sessionId = params.get("session_id") || "";
+    const token = params.get("token") || localStorage.getItem("vf_token") || "";
+    const msg = document.getElementById("msg");
+    const discord = document.getElementById("discord");
+    const q = sessionId ? `session_id=${encodeURIComponent(sessionId)}` : `token=${encodeURIComponent(token)}`;
+    fetch(`/api/community?${q}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) {
+          msg.textContent = sessionId
+            ? "Payment is still settling. Refresh in a few seconds. If this persists, check the Stripe webhook."
+            : "Open this page after checkout, or use the access link from your receipt.";
+          return;
+        }
+        if (d.token) localStorage.setItem("vf_token", d.token);
+        msg.textContent = `Paid as ${d.email}. This is the room.`;
+        if (d.discord) {
+          discord.innerHTML = `<a class="btn-primary" href="${d.discord}">Open Discord</a>`;
+        } else {
+          discord.textContent = "Discord invite is not configured yet. You are still a paid member.";
+        }
+      })
+      .catch(() => {
+        msg.textContent = "Could not confirm membership.";
+      });
   </script>
 </body>
 </html>

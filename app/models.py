@@ -24,6 +24,7 @@ class OperatorConfig(Base):
     subs: Mapped[str] = mapped_column(Text, default="Entrepreneur,smallbusiness,marketing,sales")
     day_zero: Mapped[str] = mapped_column(String(32), default="")
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stripe_price_id: Mapped[str] = mapped_column(String(64), default="")
 
 
 class SourceItem(Base):

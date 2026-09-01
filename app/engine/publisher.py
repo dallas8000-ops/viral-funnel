@@ -10,7 +10,25 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import FactoryJob, PipelineRun, ScheduledPost
-from app.settings import get_settings
+from app.settings import ASSET_DIR, get_settings
+
+
+def asset_path(job: FactoryJob) -> Path:
+    p = Path(job.asset_dir)
+    return p if p.is_absolute() else ASSET_DIR / p
+
+
+def pack_public(job: FactoryJob) -> dict:
+    folder = asset_path(job)
+    name = folder.name
+    slides = sorted(folder.glob("slide_*.png")) if folder.exists() else []
+    reels = sorted(folder.glob("reel_*.png")) if folder.exists() else []
+    return {
+        "folder": name,
+        "pack_url": f"/assets/{name}/pack.json",
+        "slide_urls": [f"/assets/{name}/{p.name}" for p in slides],
+        "reel_urls": [f"/assets/{name}/{p.name}" for p in reels],
+    }
 
 
 async def due_posts(session: AsyncSession) -> list[ScheduledPost]:
@@ -39,11 +57,11 @@ async def _ig_publish(job: FactoryJob) -> str:
     if not token or not ig:
         return "export"
 
-    slides = sorted(Path(job.asset_dir).glob("slide_*.png"))
+    slides = sorted(asset_path(job).glob("slide_*.png"))
     if not slides:
         raise RuntimeError("no slides")
     public = settings.public_url.rstrip("/")
-    image_url = f"{public}/assets/{Path(job.asset_dir).name}/{slides[0].name}"
+    image_url = f"{public}/assets/{asset_path(job).name}/{slides[0].name}"
     async with httpx.AsyncClient(timeout=20.0) as client:
         create = await client.post(
             f"https://graph.facebook.com/v21.0/{ig}/media",
@@ -92,7 +110,7 @@ async def publish_due(session: AsyncSession) -> dict:
             result = await _ig_publish(job)
             if result == "export":
                 post.status = "exported"
-                post.published_url = job.asset_dir
+                post.published_url = str(asset_path(job))
                 exported += 1
             else:
                 post.status = "published"

@@ -12,19 +12,29 @@
     <p class="brand">$49 / MONTH · CANCEL ANYTIME</p>
     <h1 id="headline">Stop collecting tactics. Get in the room that ships.</h1>
     <p class="muted" id="sub">One offer. Weekly teardowns. Live deal review. No course cemetery.</p>
+    <ul id="bullets" class="muted"></ul>
     <p class="price">$49 per month. Access starts when payment clears. No free trial — the 30-day clock does not survive free riders.</p>
+    <label>Email for the receipt<input id="email" type="email" placeholder="you@company.com" /></label>
     <button id="pay" class="btn-primary">Join the community</button>
     <p class="muted" id="err"></p>
   </main>
   <script>
-    fetch("/api/scoreboard").then(r => r.json()).then(s => {
+    fetch("/api/offer").then(r => r.json()).then(s => {
       if (s.offer_name) document.getElementById("headline").textContent = s.offer_name;
+      if (s.promise) document.getElementById("sub").textContent = s.promise;
+      const lines = (s.offer_bullets || "").split("\n").map(x => x.trim()).filter(Boolean);
+      document.getElementById("bullets").innerHTML = lines.map(l => `<li>${l}</li>`).join("");
     });
     document.getElementById("pay").onclick = async () => {
       const err = document.getElementById("err");
       err.textContent = "";
+      const email = document.getElementById("email").value.trim();
       try {
-        const r = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const r = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email || null }),
+        });
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || "Checkout failed");
         location.href = d.url;

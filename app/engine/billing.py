@@ -5,14 +5,10 @@ from fastapi import HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.engine.pipeline import load_config
 from app.engine.scoreboard import new_access_token
 from app.models import Member
 from app.settings import get_settings
-
-
-def stripe_ready() -> bool:
-    s = get_settings()
-    return bool(s.stripe_secret_key and (s.stripe_price_id or True))
 
 
 def client() -> stripe.StripeClient:
@@ -23,20 +19,30 @@ def client() -> stripe.StripeClient:
     return stripe
 
 
-async def checkout_url(email: str | None = None) -> str:
+async def resolve_price_id(session: AsyncSession) -> str:
+    s = get_settings()
+    if s.stripe_price_id:
+        return s.stripe_price_id
+    cfg = await load_config(session)
+    if cfg.stripe_price_id:
+        return cfg.stripe_price_id
+    client()
+    product = stripe.Product.create(name=cfg.offer_name or "Operator Community")
+    created = stripe.Price.create(
+        product=product.id,
+        unit_amount=s.stripe_price_cents,
+        currency="usd",
+        recurring={"interval": "month"},
+    )
+    cfg.stripe_price_id = created.id
+    return created.id
+
+
+async def checkout_url(session: AsyncSession, email: str | None = None) -> str:
     s = get_settings()
     client()
-    price = s.stripe_price_id
-    if not price:
-        product = stripe.Product.create(name="Operator Community")
-        created = stripe.Price.create(
-            product=product.id,
-            unit_amount=s.stripe_price_cents,
-            currency="usd",
-            recurring={"interval": "month"},
-        )
-        price = created.id
-    session = stripe.checkout.Session.create(
+    price = await resolve_price_id(session)
+    checkout = stripe.checkout.Session.create(
         mode="subscription",
         line_items=[{"price": price, "quantity": 1}],
         success_url=f"{s.public_url}/community?session_id={{CHECKOUT_SESSION_ID}}",
@@ -45,7 +51,7 @@ async def checkout_url(email: str | None = None) -> str:
         allow_promotion_codes=True,
         billing_address_collection="auto",
     )
-    return session.url or ""
+    return checkout.url or ""
 
 
 async def upsert_member(session: AsyncSession, email: str, customer_id: str, sub_id: str, status: str) -> Member:
@@ -57,6 +63,24 @@ async def upsert_member(session: AsyncSession, email: str, customer_id: str, sub
     row.stripe_subscription_id = sub_id
     row.status = status
     return row
+
+
+async def member_from_checkout_session(session: AsyncSession, session_id: str) -> Member | None:
+    client()
+    try:
+        checkout = stripe.checkout.Session.retrieve(session_id)
+    except Exception as exc:
+        raise HTTPException(400, f"Unable to load checkout: {exc}") from exc
+    email = (checkout.get("customer_details") or {}).get("email") or checkout.get("customer_email")
+    if not email or checkout.get("status") != "complete":
+        return None
+    return await upsert_member(
+        session,
+        email=email,
+        customer_id=str(checkout.get("customer") or ""),
+        sub_id=str(checkout.get("subscription") or ""),
+        status="active",
+    )
 
 
 async def handle_webhook(request: Request, session: AsyncSession) -> dict:

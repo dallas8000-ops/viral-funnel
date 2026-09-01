@@ -1,6 +1,11 @@
 .venv/
 data/
 .env
+.env.local
 __pycache__/
 *.pyc
 .pytest_cache/
+.stripe-installer/
+stripe_billing/
+stripe.config.json
+db/

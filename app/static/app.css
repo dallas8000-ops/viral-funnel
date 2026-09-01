@@ -74,7 +74,14 @@ td { padding: var(--space-3) var(--space-2) var(--space-3) 0; border-bottom: 1px
 .FAILED, .KILL_WARNING { color: var(--color-error); }
 .HIT { color: var(--color-success); }
 .OFF_PACE { color: var(--color-warning); }
-.join { max-width: 640px; margin: 0 auto; padding: var(--space-8, 64px) var(--space-5); }
+.preview { margin-top: var(--space-5); }
+.slides { display: flex; gap: var(--space-3); overflow-x: auto; padding-bottom: var(--space-3); }
+.slides img { width: 180px; height: auto; border-radius: var(--radius-md); border: 1px solid var(--color-border); flex: 0 0 auto; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: rgba(255,255,255,.03); }
+.join { max-width: 640px; margin: 0 auto; padding: 64px var(--space-5); }
+.join ul { padding-left: 1.2em; margin: var(--space-4) 0; }
+.join label { margin-bottom: var(--space-4); }
 .join h1 { font-size: 36px; line-height: 1.15; }
 .join .price { font-size: 20px; margin: var(--space-4) 0 var(--space-5); }
 @media (max-width: 768px) {

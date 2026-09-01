@@ -62,12 +62,24 @@ async function loadQueue() {
   const data = await j("/api/queue");
   $("queueBody").innerHTML = data.posts
     .map((p) => {
-      const pack = p.asset_dir
-        ? `<a href="/assets/${p.asset_dir.split(/[/\\\\]/).pop()}/pack.json">open</a>`
-        : "";
-      return `<tr><td>${p.publish_at.replace("T", " ").slice(0, 16)}</td><td><span class="badge">${p.status}</span></td><td>${p.hook}</td><td>${pack}</td></tr>`;
+      const pack = p.pack_url ? `<a href="${p.pack_url}">json</a>` : "";
+      return `<tr class="clickable" data-job="${p.job_id}"><td>${p.publish_at.replace("T", " ").slice(0, 16)}</td><td><span class="badge">${p.status}</span></td><td>${p.hook}</td><td>${pack}</td></tr>`;
     })
     .join("");
+}
+
+async function showPreview(jobId) {
+  const job = await j(`/api/jobs/${jobId}`);
+  $("preview").hidden = false;
+  $("previewHook").textContent = job.hook || "Preview";
+  $("previewCaption").textContent = job.caption || "";
+  $("previewSlides").innerHTML = (job.slide_urls || [])
+    .map((src) => `<img src="${src}" alt="" />`)
+    .join("");
+  $("previewPack").href = job.pack_url || "#";
+  $("copyCaption").onclick = async () => {
+    await navigator.clipboard.writeText(job.caption || "");
+  };
 }
 
 document.querySelectorAll(".nav").forEach((btn) => {
@@ -79,12 +91,29 @@ document.querySelectorAll(".nav").forEach((btn) => {
   });
 });
 
+$("queueBody").addEventListener("click", (e) => {
+  const row = e.target.closest("tr[data-job]");
+  if (!row) return;
+  showPreview(row.dataset.job);
+});
+
 $("cfg").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const fd = new FormData(e.target);
-  const body = Object.fromEntries(fd.entries());
-  await j("/api/config", { method: "PUT", body: JSON.stringify(body) });
-  await loadBoard();
+  const btn = e.target.querySelector("[type=submit]");
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const fd = new FormData(e.target);
+    const body = Object.fromEntries(fd.entries());
+    await j("/api/config", { method: "PUT", body: JSON.stringify(body) });
+    btn.textContent = "Saved ✓";
+    await loadBoard();
+  } catch (err) {
+    btn.textContent = "Error: " + (err.message || err);
+  } finally {
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+  }
 });
 
 $("startClock").addEventListener("click", async () => {
@@ -94,12 +123,15 @@ $("startClock").addEventListener("click", async () => {
 
 $("runFactory").addEventListener("click", async () => {
   $("timings").textContent = "Running…";
+  $("runFactory").disabled = true;
   try {
     const r = await j("/api/factory", { method: "POST", body: "{}" });
     $("timings").textContent = JSON.stringify(r, null, 2);
     await Promise.all([loadBoard(), loadSources(), loadQueue()]);
   } catch (err) {
     $("timings").textContent = String(err.message || err);
+  } finally {
+    $("runFactory").disabled = false;
   }
 });
 

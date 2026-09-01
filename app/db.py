@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy import event
 
 from app.models import Base
 from app.settings import DB_PATH, get_settings
@@ -38,9 +38,19 @@ engine = _engine()
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
+def _add_missing_columns(connection) -> None:
+    rows = connection.execute(text("PRAGMA table_info(operator_config)")).fetchall()
+    names = {r[1] for r in rows}
+    if names and "stripe_price_id" not in names:
+        connection.execute(
+            text("ALTER TABLE operator_config ADD COLUMN stripe_price_id VARCHAR(64) DEFAULT ''")
+        )
+
+
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_add_missing_columns)
 
 
 @asynccontextmanager
